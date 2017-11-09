@@ -247,6 +247,16 @@ if( ITK_USE_GPU )
 endif()
 
 #-----------------------------------------------------------------------------
+# Enable support for Intel TBB as threading backend.
+option(ITK_USE_TBB "Intel TBB threading backend" OFF)
+mark_as_advanced(ITK_USE_TBB)
+
+if (ITK_USE_TBB)
+    find_package(TBB REQUIRED)
+    add_definitions(-DUSE_TBB)
+endif()
+
+#-----------------------------------------------------------------------------
 # Manage FFT v3 Options
 #
 # ITK_USE_FFTWD -- use double precision fftw

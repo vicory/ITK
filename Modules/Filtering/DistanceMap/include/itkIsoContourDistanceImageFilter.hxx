@@ -39,6 +39,8 @@ IsoContourDistanceImageFilter< TInputImage, TOutputImage >
   m_NarrowBand = ITK_NULLPTR;
 
   m_Barrier = Barrier::New();
+
+  this->UseOldBehavior(true);
 }
 
 /**

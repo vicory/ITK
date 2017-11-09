@@ -41,6 +41,8 @@ BinaryContourImageFilter< TInputImage, TOutputImage >
   m_NumberOfThreads = 0;
 
   this->SetInPlace(false);
+
+  this->UseOldBehavior(true);
 }
 
 template< typename TInputImage, typename TOutputImage >

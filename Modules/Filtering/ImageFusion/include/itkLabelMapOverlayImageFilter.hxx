@@ -31,6 +31,8 @@ LabelMapOverlayImageFilter<TLabelMap, TFeatureImage, TOutputImage>
 {
   this->SetNumberOfRequiredInputs(2);
   m_Opacity = 0.5;
+
+  this->UseOldBehavior(true);
 }
 
 template<typename TLabelMap, typename TFeatureImage, typename TOutputImage>

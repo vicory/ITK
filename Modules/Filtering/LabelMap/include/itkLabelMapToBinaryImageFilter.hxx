@@ -31,6 +31,8 @@ LabelMapToBinaryImageFilter< TInputImage, TOutputImage >
 {
   this->m_BackgroundValue = NumericTraits< OutputImagePixelType >::NonpositiveMin();
   this->m_ForegroundValue = NumericTraits< OutputImagePixelType >::max();
+
+  this->UseOldBehavior(true);
 }
 
 template< typename TInputImage, typename TOutputImage >

@@ -287,6 +287,9 @@ macro(check_compiler_platform_flags)
     set(ITK_REQUIRED_LINK_FLAGS "${ITK_REQUIRED_LINK_FLAGS} -mthreads")
   endif()
 
+  if (ITK_USE_TBB)
+    set(ITK_REQUIRED_LINK_FLAGS "${ITK_REQUIRED_LINK_FLAGS} -ltbb")
+  endif()
 
   #-----------------------------------------------------------------------------
   # The frename-registers option does not work due to a bug in the gnu compiler.

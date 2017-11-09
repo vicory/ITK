@@ -37,6 +37,8 @@ LabelMapMaskImageFilter<TInputImage, TOutputImage>
 {
   this->SetNumberOfRequiredInputs(2);
   m_CropBorder.Fill( 0 );
+
+  this->UseOldBehavior(true);
 }
 
 template <typename TInputImage, typename TOutputImage>

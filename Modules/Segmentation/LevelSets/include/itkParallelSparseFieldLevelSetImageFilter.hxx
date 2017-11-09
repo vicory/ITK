@@ -147,6 +147,8 @@ ParallelSparseFieldLevelSetImageFilter< TInputImage, TOutputImage >
   m_BoundsCheckingActive(false)
 {
   this->SetRMSChange( static_cast< double >( m_ValueOne ) );
+
+  this->UseOldBehavior(true);
 }
 
 template< typename TInputImage, typename TOutputImage >

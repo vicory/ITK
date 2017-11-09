@@ -103,10 +103,18 @@ namespace itk
  * \wikiexample{Developer/ImageFilterMultipleOutputsDifferentType,Write a filter with multiple outputs of different types.}
  * \endwiki
  */
+#if defined(USE_TBB)
+template< typename TInputImage, typename TOutputImage >
+class TBBFunctor;
+#endif
+
 template< typename TInputImage, typename TOutputImage >
 class ITK_TEMPLATE_EXPORT ImageToImageFilter:public ImageSource< TOutputImage >,
   private ImageToImageFilterCommon
 {
+  #if defined(USE_TBB)
+  friend class TBBFunctor<TInputImage,TOutputImage>;
+  #endif
 public:
   /** Standard class typedefs. */
   typedef ImageToImageFilter          Self;
@@ -134,6 +142,10 @@ public:
   itkStaticConstMacro(OutputImageDimension, unsigned int,
                       TOutputImage::ImageDimension);
 
+#if defined(USE_TBB)
+  void UseOldBehavior(bool UseOldBehavior);
+//  const ThreadIdType & GetNumberOfThreads() ITK_OVERRIDE;
+#endif
   /** Set/Get the image input of this process object.  */
   using Superclass::SetInput;
   virtual void SetInput(const InputImageType *image);
@@ -355,6 +367,12 @@ protected:
   { Superclass::PushBackInput(input); }
   void PushFrontInput(const DataObject *input) ITK_OVERRIDE
   { Superclass::PushFrontInput(input); }
+#if defined(USE_TBB)
+  bool m_UseOldBehavior;
+  void GenerateData() ITK_OVERRIDE;
+  void ThreadedGenerateData(const OutputImageRegionType & outputRegionForThread,
+                            ThreadIdType threadId) ITK_OVERRIDE;
+#endif
 
 private:
   ITK_DISALLOW_COPY_AND_ASSIGN(ImageToImageFilter);
@@ -364,6 +382,7 @@ private:
    */
   double m_CoordinateTolerance;
   double m_DirectionTolerance;
+  unsigned int m_NumberOfJobs;
 };
 } // end namespace itk
 

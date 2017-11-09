@@ -51,6 +51,8 @@ ConnectedComponentImageFilter< TInputImage, TOutputImage, TMaskImage >
     {
     mask->SetRequestedRegion( input->GetLargestPossibleRegion() );
     }
+
+  this->UseOldBehavior(true);
 }
 
 template< typename TInputImage, typename TOutputImage, typename TMaskImage >
