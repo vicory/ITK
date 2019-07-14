@@ -25,6 +25,9 @@
 #include "itkNeighborhoodAlgorithm.h"
 #include "itkMath.h"
 
+#include "itkBinaryThresholdImageFilter.h"
+#include "itkConnectedComponentImageFilter.h"
+
 namespace itk
 {
 template< typename TNeighborhoodType >
@@ -132,6 +135,7 @@ SparseFieldLevelSetImageFilter< TInputImage, TOutputImage >
 ::SparseFieldLevelSetImageFilter() :
   m_ConstantGradientValue(1.0),
   m_NumberOfLayers(2),
+  m_PreserveTopology(false),
   m_IsoSurfaceValue(m_ValueZero),
   m_InterpolateSurfaceLocation(true),
   m_InputImage(ITK_NULLPTR),
@@ -300,6 +304,437 @@ SparseFieldLevelSetImageFilter< TInputImage, TOutputImage >
 }
 
 template< typename TInputImage, typename TOutputImage >
+bool 
+SparseFieldLevelSetImageFilter< TInputImage, TOutputImage >
+::isSimplePoint(NeighborhoodType neighbors)
+{
+  // copy neighbors for labeling
+  int cube[26];
+  int i;
+  for( i = 0; i < 13; i++ )  // i =  0..12 -> cube[0..12]
+  {
+    if (neighbors[i] < 0)
+      cube[i] = 1;
+    else
+      cube[i] = 0;
+  }
+  // i != 13 : ignore center pixel when counting (see [Lee94])
+  for( i = 14; i < 27; i++ ) // i = 14..26 -> cube[13..25]
+  {
+    if (neighbors[i] < 0)
+      cube[i-1] = 1;
+    else
+      cube[i-1] = 0;
+  }
+  // set initial label
+  int label = 2;
+  // for all points in the neighborhood
+  for( int i = 0; i < 26; i++ )
+  {
+    if( cube[i]==1 )     // voxel has not been labelled yet
+    {
+      // start recursion with any octant that contains the point i
+      switch( i )
+      {
+      case 0:
+      case 1:
+      case 3:
+      case 4:
+      case 9:
+      case 10:
+      case 12:
+        Octree_labeling(1, label, cube );
+        break;
+      case 2:
+      case 5:
+      case 11:
+      case 13:
+        Octree_labeling(2, label, cube );
+        break;
+      case 6:
+      case 7:
+      case 14:
+      case 15:
+        Octree_labeling(3, label, cube );
+        break;
+      case 8:
+      case 16:
+        Octree_labeling(4, label, cube );
+        break;
+      case 17:
+      case 18:
+      case 20:
+      case 21:
+        Octree_labeling(5, label, cube );
+        break;
+      case 19:
+      case 22:
+        Octree_labeling(6, label, cube );
+        break;
+      case 23:
+      case 24:
+        Octree_labeling(7, label, cube );
+        break;
+      case 25:
+        Octree_labeling(8, label, cube );
+        break;
+      }
+      label++;
+      if( label-2 >= 2 )
+      {
+        return false;
+      }
+    }
+  }
+  //return label-2; in [Lee94] if the number of connected compontents would be needed
+  return true;
+}
+
+/** 
+ * Octree_labeling [Lee94]
+ * This is a recursive method that calulates the number of connected
+ * components in the 3D neighbourhood after the center pixel would
+ * have been removed.
+ */
+template <class TInputImage,class TOutputImage>
+void 
+SparseFieldLevelSetImageFilter<TInputImage,TOutputImage>
+::Octree_labeling(int octant, int label, int *cube)
+{
+  // check if there are points in the octant with value 1
+  if( octant==1 )
+  {
+  	// set points in this octant to current label
+  	// and recurseive labeling of adjacent octants
+    if( cube[0] == 1 )
+      cube[0] = label;
+    if( cube[1] == 1 )
+    {
+      cube[1] = label;        
+      Octree_labeling( 2, label, cube);
+    }
+    if( cube[3] == 1 )
+    {
+      cube[3] = label;        
+      Octree_labeling( 3, label, cube);
+    }
+    if( cube[4] == 1 )
+    {
+      cube[4] = label;        
+      Octree_labeling( 2, label, cube);
+      Octree_labeling( 3, label, cube);
+      Octree_labeling( 4, label, cube);
+    }
+    if( cube[9] == 1 )
+    {
+      cube[9] = label;        
+      Octree_labeling( 5, label, cube);
+    }
+    if( cube[10] == 1 )
+    {
+      cube[10] = label;        
+      Octree_labeling( 2, label, cube);
+      Octree_labeling( 5, label, cube);
+      Octree_labeling( 6, label, cube);
+    }
+    if( cube[12] == 1 )
+    {
+      cube[12] = label;        
+      Octree_labeling( 3, label, cube);
+      Octree_labeling( 5, label, cube);
+      Octree_labeling( 7, label, cube);
+    }
+  }
+  if( octant==2 )
+  {
+    if( cube[1] == 1 )
+    {
+      cube[1] = label;
+      Octree_labeling( 1, label, cube);
+    }
+    if( cube[4] == 1 )
+    {
+      cube[4] = label;        
+      Octree_labeling( 1, label, cube);
+      Octree_labeling( 3, label, cube);
+      Octree_labeling( 4, label, cube);
+    }
+    if( cube[10] == 1 )
+    {
+      cube[10] = label;        
+      Octree_labeling( 1, label, cube);
+      Octree_labeling( 5, label, cube);
+      Octree_labeling( 6, label, cube);
+    }
+    if( cube[2] == 1 )
+      cube[2] = label;        
+    if( cube[5] == 1 )
+    {
+      cube[5] = label;        
+      Octree_labeling( 4, label, cube);
+    }
+    if( cube[11] == 1 )
+    {
+      cube[11] = label;        
+      Octree_labeling( 6, label, cube);
+    }
+    if( cube[13] == 1 )
+    {
+      cube[13] = label;        
+      Octree_labeling( 4, label, cube);
+      Octree_labeling( 6, label, cube);
+      Octree_labeling( 8, label, cube);
+    }
+  }
+  if( octant==3 )
+  {
+    if( cube[3] == 1 )
+    {
+      cube[3] = label;        
+      Octree_labeling( 1, label, cube);
+    }
+    if( cube[4] == 1 )
+    {
+      cube[4] = label;        
+      Octree_labeling( 1, label, cube);
+      Octree_labeling( 2, label, cube);
+      Octree_labeling( 4, label, cube);
+    }
+    if( cube[12] == 1 )
+    {
+      cube[12] = label;        
+      Octree_labeling( 1, label, cube);
+      Octree_labeling( 5, label, cube);
+      Octree_labeling( 7, label, cube);
+    }
+    if( cube[6] == 1 )
+      cube[6] = label;        
+    if( cube[7] == 1 )
+    {
+      cube[7] = label;        
+      Octree_labeling( 4, label, cube);
+    }
+    if( cube[14] == 1 )
+    {
+      cube[14] = label;        
+      Octree_labeling( 7, label, cube);
+    }
+    if( cube[15] == 1 )
+    {
+      cube[15] = label;        
+      Octree_labeling( 4, label, cube);
+      Octree_labeling( 7, label, cube);
+      Octree_labeling( 8, label, cube);
+    }
+  }
+  if( octant==4 )
+  {
+  	if( cube[4] == 1 )
+    {
+      cube[4] = label;        
+      Octree_labeling( 1, label, cube);
+      Octree_labeling( 2, label, cube);
+      Octree_labeling( 3, label, cube);
+    }
+  	if( cube[5] == 1 )
+    {
+      cube[5] = label;        
+      Octree_labeling( 2, label, cube);
+    }
+    if( cube[13] == 1 )
+    {
+      cube[13] = label;        
+      Octree_labeling( 2, label, cube);
+      Octree_labeling( 6, label, cube);
+      Octree_labeling( 8, label, cube);
+    }
+    if( cube[7] == 1 )
+    {
+      cube[7] = label;        
+      Octree_labeling( 3, label, cube);
+    }
+    if( cube[15] == 1 )
+    {
+      cube[15] = label;        
+      Octree_labeling( 3, label, cube);
+      Octree_labeling( 7, label, cube);
+      Octree_labeling( 8, label, cube);
+    }
+    if( cube[8] == 1 )
+      cube[8] = label;        
+    if( cube[16] == 1 )
+    {
+      cube[16] = label;        
+      Octree_labeling( 8, label, cube);
+    }
+  }
+  if( octant==5 )
+  {
+  	if( cube[9] == 1 )
+    {
+      cube[9] = label;        
+      Octree_labeling( 1, label, cube);
+    }
+    if( cube[10] == 1 )
+    {
+      cube[10] = label;        
+      Octree_labeling( 1, label, cube);
+      Octree_labeling( 2, label, cube);
+      Octree_labeling( 6, label, cube);
+    }
+    if( cube[12] == 1 )
+    {
+      cube[12] = label;        
+      Octree_labeling( 1, label, cube);
+      Octree_labeling( 3, label, cube);
+      Octree_labeling( 7, label, cube);
+    }
+    if( cube[17] == 1 )
+      cube[17] = label;        
+    if( cube[18] == 1 )
+    {
+      cube[18] = label;        
+      Octree_labeling( 6, label, cube);
+    }
+    if( cube[20] == 1 )
+    {
+      cube[20] = label;        
+      Octree_labeling( 7, label, cube);
+    }
+    if( cube[21] == 1 )
+    {
+      cube[21] = label;        
+      Octree_labeling( 6, label, cube);
+      Octree_labeling( 7, label, cube);
+      Octree_labeling( 8, label, cube);
+    }
+  }
+  if( octant==6 )
+  {
+  	if( cube[10] == 1 )
+    {
+      cube[10] = label;        
+      Octree_labeling( 1, label, cube);
+      Octree_labeling( 2, label, cube);
+      Octree_labeling( 5, label, cube);
+    }
+    if( cube[11] == 1 )
+    {
+      cube[11] = label;        
+      Octree_labeling( 2, label, cube);
+    }
+    if( cube[13] == 1 )
+    {
+      cube[13] = label;        
+      Octree_labeling( 2, label, cube);
+      Octree_labeling( 4, label, cube);
+      Octree_labeling( 8, label, cube);
+    }
+    if( cube[18] == 1 )
+    {
+      cube[18] = label;        
+      Octree_labeling( 5, label, cube);
+    }
+    if( cube[21] == 1 )
+    {
+      cube[21] = label;        
+      Octree_labeling( 5, label, cube);
+      Octree_labeling( 7, label, cube);
+      Octree_labeling( 8, label, cube);
+    }
+    if( cube[19] == 1 )
+      cube[19] = label;        
+    if( cube[22] == 1 )
+    {
+      cube[22] = label;        
+      Octree_labeling( 8, label, cube);
+    }
+  }
+  if( octant==7 )
+  {
+  	if( cube[12] == 1 )
+    {
+      cube[12] = label;        
+      Octree_labeling( 1, label, cube);
+      Octree_labeling( 3, label, cube);
+      Octree_labeling( 5, label, cube);
+    }
+  	if( cube[14] == 1 )
+    {
+      cube[14] = label;        
+      Octree_labeling( 3, label, cube);
+    }
+    if( cube[15] == 1 )
+    {
+      cube[15] = label;        
+      Octree_labeling( 3, label, cube);
+      Octree_labeling( 4, label, cube);
+      Octree_labeling( 8, label, cube);
+    }
+    if( cube[20] == 1 )
+    {
+      cube[20] = label;        
+      Octree_labeling( 5, label, cube);
+    }
+    if( cube[21] == 1 )
+    {
+      cube[21] = label;        
+      Octree_labeling( 5, label, cube);
+      Octree_labeling( 6, label, cube);
+      Octree_labeling( 8, label, cube);
+    }
+    if( cube[23] == 1 )
+      cube[23] = label;        
+    if( cube[24] == 1 )
+    {
+      cube[24] = label;        
+      Octree_labeling( 8, label, cube);
+    }
+  }
+  if( octant==8 )
+  {
+  	if( cube[13] == 1 )
+    {
+      cube[13] = label;        
+      Octree_labeling( 2, label, cube);
+      Octree_labeling( 4, label, cube);
+      Octree_labeling( 6, label, cube);
+    }
+  	if( cube[15] == 1 )
+    {
+      cube[15] = label;        
+      Octree_labeling( 3, label, cube);
+      Octree_labeling( 4, label, cube);
+      Octree_labeling( 7, label, cube);
+    }
+  	if( cube[16] == 1 )
+    {
+      cube[16] = label;        
+      Octree_labeling( 4, label, cube);
+    }
+  	if( cube[21] == 1 )
+    {
+      cube[21] = label;        
+      Octree_labeling( 5, label, cube);
+      Octree_labeling( 6, label, cube);
+      Octree_labeling( 7, label, cube);
+    }
+  	if( cube[22] == 1 )
+    {
+      cube[22] = label;        
+      Octree_labeling( 6, label, cube);
+    }
+  	if( cube[24] == 1 )
+    {
+      cube[24] = label;        
+      Octree_labeling( 7, label, cube);
+    }
+  	if( cube[25] == 1 )
+      cube[25] = label;        
+  } 
+}
+
+template< typename TInputImage, typename TOutputImage >
 void
 SparseFieldLevelSetImageFilter< TInputImage, TOutputImage >
 ::UpdateActiveLayerValues(TimeStepType dt,
@@ -319,7 +754,7 @@ SparseFieldLevelSetImageFilter< TInputImage, TOutputImage >
   ValueType      new_value, temp_value, rms_change_accumulator;
   LayerNodeType *node, *release_node;
   StatusType     neighbor_status;
-  unsigned int   i, idx, counter;
+  unsigned int   i, idx, counter, topcounter, allcounter;
   bool           bounds_status, flag;
 
   typename LayerType::Iterator layerIt;
@@ -340,6 +775,8 @@ SparseFieldLevelSetImageFilter< TInputImage, TOutputImage >
     }
 
   counter = 0;
+  topcounter = 0;
+  allcounter = 0;
   rms_change_accumulator = m_ValueZero;
   layerIt = m_Layers[0]->Begin();
   updateIt = m_UpdateBuffer.begin();
@@ -469,6 +906,34 @@ SparseFieldLevelSetImageFilter< TInputImage, TOutputImage >
       }
     else
       {
+        // check topology
+        if (m_PreserveTopology)
+        {
+          ValueType old_value = outputIt.GetCenterPixel();
+
+          int old_sign, new_sign;
+
+          if (old_value < 0)
+            old_sign = -1;
+          else
+            old_sign = 1;
+
+          if (new_value < 0)
+            new_sign = -1;
+          else
+            new_sign = 1;
+
+          if ( old_sign != new_sign )
+          {
+            if (!isSimplePoint(outputIt.GetNeighborhood()))
+            {
+              new_value = old_sign*0.01;
+              ++topcounter; 
+            }
+            ++allcounter;
+          }
+        }
+
       rms_change_accumulator += itk::Math::sqr( new_value - outputIt.GetCenterPixel() );
       //rms_change_accumulator += (*updateIt) * (*updateIt);
       outputIt.SetCenterPixel(new_value);
@@ -477,6 +942,8 @@ SparseFieldLevelSetImageFilter< TInputImage, TOutputImage >
     ++updateIt;
     ++counter;
     }
+
+    std::cout << "Stopped " << topcounter << " of " << allcounter << " from changing" << std::endl;
 
   // Determine the average change during this iteration.
   if ( counter == 0 )

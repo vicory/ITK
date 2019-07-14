@@ -283,11 +283,17 @@ public:
   /** Container type used to store updates to the active layer. */
   typedef std::vector< ValueType > UpdateBufferType;
 
+  typedef NeighborhoodIterator<InputImageType> NeighborhoodIteratorType;
+  typedef typename NeighborhoodIteratorType::NeighborhoodType NeighborhoodType;
+
   /** Set/Get the number of layers to use in the sparse field.  Argument is the
    *  number of layers on ONE side of the active layer, so the total layers in
    *   the sparse field is 2 * NumberOfLayers +1 */
   itkSetMacro(NumberOfLayers, unsigned int);
   itkGetConstMacro(NumberOfLayers, unsigned int);
+
+  itkSetMacro(PreserveTopology, bool);
+  itkGetConstMacro(PreserveTopology, bool);
 
   /** Set/Get the value of the isosurface to use in the input image. */
   itkSetMacro(IsoSurfaceValue, ValueType);
@@ -403,6 +409,9 @@ protected:
   /** Updates the active layer values using m_UpdateBuffer. Also creates an
    *  "up" and "down" list for promotion/demotion of indices leaving the
    *  active set. */
+  
+  bool isSimplePoint(NeighborhoodType neighbors);
+  void Octree_labeling(int octant, int label, int *cube);
   void UpdateActiveLayerValues(TimeStepType dt, LayerType *StatusUpList,
                                LayerType *StatusDownList);
 
@@ -466,6 +475,8 @@ protected:
    * This active layer is the interface of interest, i.e. the zero
    * level set. */
   unsigned int m_NumberOfLayers;
+
+  bool m_PreserveTopology;
 
   /** An image of status values used internally by the algorithm. */
   typename StatusImageType::Pointer m_StatusImage;
