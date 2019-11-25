@@ -308,21 +308,18 @@ public:
 
 private:
   /** use different epsilon for float and double */
-  static inline ValueType
-  Epsilon(double *)
-  {
-    return 1e-10;
-  }
-  static inline ValueType
-  Epsilon(float *)
-  {
-    return 1e-7;
-  }
-  static inline ValueType
-  Epsilon()
-  {
-    return Epsilon((ValueType *)nullptr);
-  }
+  static inline ValueType Epsilon(double *)
+    {
+      return 1e-8;
+    }
+  static inline ValueType Epsilon(float *)
+    {
+      return 1e-5;
+    }
+  static inline ValueType Epsilon()
+    {
+      return Epsilon((ValueType *)nullptr);
+    }
 
   /** Component parallel to x axis.  */
   ValueType m_X;
